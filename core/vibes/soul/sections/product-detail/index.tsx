@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 import { Stream, Streamable } from '@/vibes/soul/lib/streamable';
 import { Accordion, AccordionItem } from '@/vibes/soul/primitives/accordion';
@@ -35,6 +35,7 @@ interface ProductDetailProduct {
 
 export interface ProductDetailProps<F extends Field> {
   breadcrumbs?: Streamable<Breadcrumb[]>;
+  badgeBar?: ReactNode; // ✅ ADD THIS
   product: Streamable<ProductDetailProduct | null>;
   action: ProductDetailFormAction<F>;
   fields: Streamable<F[]>;
@@ -67,6 +68,7 @@ export interface ProductDetailProps<F extends Field> {
  */
 export function ProductDetail<F extends Field>({
   product: streamableProduct,
+  badgeBar, // ✅ add this line
   action,
   fields: streamableFields,
   breadcrumbs,
@@ -107,7 +109,15 @@ export function ProductDetail<F extends Field>({
                   )}
                   <h1 className="mb-3 mt-2 font-[family-name:var(--product-detail-title-font-family,var(--font-family-heading))] text-2xl font-medium leading-none @xl:mb-4 @xl:text-3xl @4xl:text-4xl">
                     {product.title}
+                    
                   </h1>
+                  {/* ✅ BADGE BAR — directly under product title */}
+                  {badgeBar ? (
+                    <div className="mb-3 flex flex-wrap gap-1.5">
+                    {badgeBar}
+                    </div>
+                    ) : null}
+
                   <div className="group/product-rating">
                     <Stream fallback={<RatingSkeleton />} value={product.rating}>
                       {(rating) => <Rating rating={rating ?? 0} />}

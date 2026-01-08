@@ -6,7 +6,7 @@ import { COMPONENT_TYPE } from './register';
 type Props = ClientProps & { productId: number };
 
 export const ProductDetail = ({ productId, ...props }: Props) => (
-  <PropsContextProvider value={props}>
+  <PropsContextProvider value={{ ...props, productId }}>
     <Component
       label={(async () =>
         `Detail for ${await Promise.resolve(props.product).then(({ title }) => title)}`)()}

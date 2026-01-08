@@ -1,4 +1,4 @@
-import { Group, List, Select, Slot, TextArea, TextInput } from '@makeswift/runtime/controls';
+import { Checkbox, Group, List, Select, Slot, TextArea, TextInput } from '@makeswift/runtime/controls';
 
 import { runtime } from '~/lib/makeswift/runtime';
 
@@ -22,6 +22,51 @@ const description = Group({
   },
 });
 
+const badges = Group({
+  label: 'Badge bar',
+  props: {
+    enabled: Checkbox({
+      label: 'Enable badge bar',
+      defaultValue: true,
+    }),
+
+    // Placement can stay for now, but note: since we now inject under the title via `badgeBar`,
+    // placement only matters if you want to support other positions later.
+    placement: Select({
+      label: 'Placement',
+      options: [
+        { label: 'Under title', value: 'UnderTitle' }, // friendlier
+      ],
+      defaultValue: 'UnderTitle',
+    }),
+
+    label: TextInput({
+      label: 'Badge text',
+      defaultValue: 'SALE',
+    }),
+
+    variant: Select({
+      label: 'Style',
+      options: [
+        { label: 'Sale (cerulean)', value: 'sale' },
+        { label: 'Neutral', value: 'neutral' },
+        { label: 'Info', value: 'info' },
+        { label: 'Success', value: 'success' },
+        { label: 'Warning', value: 'warning' },
+      ],
+      defaultValue: 'sale',
+    }),
+
+    href: TextInput({
+      label: 'Link (optional)',
+      defaultValue: '/sale',
+    }),
+
+    // Optional: allow editors to fully override with custom content if they want
+    slot: Slot(),
+  },
+});
+
 runtime.registerComponent(MakeswiftProductDetail, {
   type: COMPONENT_TYPE,
   label: 'MakeswiftProductDetail (private)',
@@ -31,6 +76,7 @@ runtime.registerComponent(MakeswiftProductDetail, {
       label: 'Summary',
     }),
     description,
+    badges,
     accordions: List({
       label: 'Product info',
       type: Group({

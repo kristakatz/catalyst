@@ -14,6 +14,12 @@ import React, {
 import { Stream, type Streamable } from '@/vibes/soul/lib/streamable';
 import { ProductDetail, ProductDetailSkeleton } from '@/vibes/soul/sections/product-detail';
 import { mergeSections } from '~/lib/makeswift/utils/merge-sections';
+import ProductBadgeBarFromProductClient from '~/components/product-badge/ProductBadgeBarFromProduct.client';
+import { BadgeBar } from '~/components/product-badge/BadgeBar';
+
+
+
+
 
 type VibesProductDetailProps = ComponentPropsWithoutRef<typeof ProductDetail>;
 type VibesProductDetail = Exclude<Awaited<VibesProductDetailProps['product']>, null>;
@@ -24,6 +30,7 @@ export type ProductDetail = VibesProductDetail & {
 
 export type Props = Omit<VibesProductDetailProps, 'product'> & {
   product: Streamable<ProductDetail>;
+  productId: number; // ✅ add this
 };
 
 const PropsContext = createContext<Props | null>(null);
@@ -40,10 +47,21 @@ export const DescriptionSource = {
 
 type DescriptionSource = (typeof DescriptionSource)[keyof typeof DescriptionSource];
 
+type BadgePlacement = 'UnderTitle';
+
 interface EditableProps {
   summaryText: string | undefined;
   description: { source: DescriptionSource; slot: ReactNode };
   accordions: Exclude<Awaited<VibesProductDetail['accordions']>, undefined>;
+
+  badges?: {
+    enabled: boolean;
+    placement: BadgePlacement;
+    slot: ReactNode;
+    label: string;
+    variant: 'sale' | 'neutral' | 'info' | 'success' | 'warning';
+    href: string;
+  };
 }
 
 const ProductDetailImpl = ({
@@ -51,8 +69,9 @@ const ProductDetailImpl = ({
   description,
   accordions,
   product: streamableProduct,
+  badgeBar,
   ...props
-}: Props & EditableProps) => {
+}: Props & EditableProps & { badgeBar?: ReactNode }) => {
   const getProductDescription = useCallback(
     (product: ProductDetail): ProductDetail['description'] => {
       switch (description.source) {
@@ -90,6 +109,7 @@ const ProductDetailImpl = ({
             <ProductDetail
               {...{
                 ...props,
+                badgeBar, // ✅ add this
                 product: {
                   ...product,
                   summary: summaryText,
@@ -112,14 +132,58 @@ export const MakeswiftProductDetail = forwardRef(
     if (passedProps == null) {
       // eslint-disable-next-line no-console
       console.error('No context provided for MakeswiftProductDetail');
-
       return <p ref={ref}>There was an error rendering the product detail.</p>;
     }
 
-    return (
-      <div className="flex flex-col" ref={ref}>
-        <ProductDetailImpl {...{ ...passedProps, ...props }} />
-      </div>
-    );
+    const ctx = passedProps;
+
+    // Don't forward badges into ProductDetailImpl
+    const { badges, ...editable } = props;
+
+const enabled = badges?.enabled ?? true;
+
+const slotHasContent = (() => {
+  if (badges?.slot == null) return false;
+
+  // Some Makeswift Slot renders a wrapper element even when empty.
+  // This checks for *actual children* inside the slot.
+  return React.Children.toArray(badges.slot).some((child) => {
+    if (!React.isValidElement(child)) return Boolean(child);
+
+    const inner = (child as any).props?.children;
+    return inner != null && React.Children.count(inner) > 0;
+  });
+})();
+
+
+const hasConfiguredLabel = Boolean(badges?.label?.trim());
+
+const badgeNode =
+  enabled
+    ? slotHasContent
+      ? badges!.slot
+      : hasConfiguredLabel
+        ? (
+            <BadgeBar
+              badges={[
+                {
+                  key: 'ms-badge-1',
+                  label: badges!.label.trim(),
+                  variant: badges!.variant,
+                  href: badges?.href?.trim() ? badges.href.trim() : undefined,
+                },
+              ]}
+            />
+          )
+        : <ProductBadgeBarFromProductClient entityId={ctx.productId} />
+    : null;
+
+
+
+      return (
+  <div className="flex flex-col gap-3" ref={ref}>
+    <ProductDetailImpl {...{ ...ctx, ...editable, badgeBar: badgeNode }} />
+  </div>
+);
   },
 );
