@@ -109,14 +109,9 @@ export function ProductDetail<F extends Field>({
                   )}
                   <h1 className="mb-3 mt-2 font-[family-name:var(--product-detail-title-font-family,var(--font-family-heading))] text-2xl font-medium leading-none @xl:mb-4 @xl:text-3xl @4xl:text-4xl">
                     {product.title}
-                    
                   </h1>
                   {/* ✅ BADGE BAR — directly under product title */}
-                  {badgeBar ? (
-                    <div className="mb-3 flex flex-wrap gap-1.5">
-                    {badgeBar}
-                    </div>
-                    ) : null}
+                  {badgeBar ? <div className="mb-3 flex flex-wrap gap-1.5">{badgeBar}</div> : null}
 
                   <div className="group/product-rating">
                     <Stream fallback={<RatingSkeleton />} value={product.rating}>

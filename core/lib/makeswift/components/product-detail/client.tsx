@@ -1,9 +1,11 @@
 'use client';
 
 import React, {
+  Children,
   type ComponentPropsWithoutRef,
   createContext,
   forwardRef,
+  isValidElement,
   type PropsWithChildren,
   type ReactNode,
   type Ref,
@@ -13,13 +15,9 @@ import React, {
 
 import { Stream, type Streamable } from '@/vibes/soul/lib/streamable';
 import { ProductDetail, ProductDetailSkeleton } from '@/vibes/soul/sections/product-detail';
+import { BadgeBar } from '~/components/product-badge/badge-bar';
+import ProductBadgeBarFromProductClient from '~/components/product-badge/product-badge-bar-from-product.client';
 import { mergeSections } from '~/lib/makeswift/utils/merge-sections';
-import ProductBadgeBarFromProductClient from '~/components/product-badge/ProductBadgeBarFromProduct.client';
-import { BadgeBar } from '~/components/product-badge/BadgeBar';
-
-
-
-
 
 type VibesProductDetailProps = ComponentPropsWithoutRef<typeof ProductDetail>;
 type VibesProductDetail = Exclude<Awaited<VibesProductDetailProps['product']>, null>;
@@ -54,7 +52,7 @@ interface EditableProps {
   description: { source: DescriptionSource; slot: ReactNode };
   accordions: Exclude<Awaited<VibesProductDetail['accordions']>, undefined>;
 
-  badges?: {
+  badges: {
     enabled: boolean;
     placement: BadgePlacement;
     slot: ReactNode;
@@ -64,6 +62,8 @@ interface EditableProps {
   };
 }
 
+type EditablePropsWithoutBadges = Omit<EditableProps, 'badges'>;
+
 const ProductDetailImpl = ({
   summaryText,
   description,
@@ -71,7 +71,7 @@ const ProductDetailImpl = ({
   product: streamableProduct,
   badgeBar,
   ...props
-}: Props & EditableProps & { badgeBar?: ReactNode }) => {
+}: Props & EditablePropsWithoutBadges & { badgeBar?: ReactNode }) => {
   const getProductDescription = useCallback(
     (product: ProductDetail): ProductDetail['description'] => {
       switch (description.source) {
@@ -125,6 +125,19 @@ const ProductDetailImpl = ({
   );
 };
 
+function hasRenderableSlotContent(node: ReactNode): boolean {
+  if (node == null) return false;
+
+  return Children.toArray(node).some((child) => {
+    if (typeof child === 'string') return child.trim().length > 0;
+
+    // numbers / elements / fragments count as content
+    if (typeof child === 'number') return true;
+
+    return isValidElement(child);
+  });
+}
+
 export const MakeswiftProductDetail = forwardRef(
   (props: EditableProps, ref: Ref<HTMLDivElement>) => {
     const passedProps = useContext(PropsContext);
@@ -132,6 +145,7 @@ export const MakeswiftProductDetail = forwardRef(
     if (passedProps == null) {
       // eslint-disable-next-line no-console
       console.error('No context provided for MakeswiftProductDetail');
+
       return <p ref={ref}>There was an error rendering the product detail.</p>;
     }
 
@@ -140,50 +154,41 @@ export const MakeswiftProductDetail = forwardRef(
     // Don't forward badges into ProductDetailImpl
     const { badges, ...editable } = props;
 
-const enabled = badges?.enabled ?? true;
+    const enabled = badges.enabled;
 
-const slotHasContent = (() => {
-  if (badges?.slot == null) return false;
+    const slot = badges.slot;
+    const slotHasContent = hasRenderableSlotContent(slot);
 
-  // Some Makeswift Slot renders a wrapper element even when empty.
-  // This checks for *actual children* inside the slot.
-  return React.Children.toArray(badges.slot).some((child) => {
-    if (!React.isValidElement(child)) return Boolean(child);
+    // If Makeswift configured a badge via fields (label/variant/href), render that via BadgeBar
+    const hasConfiguredLabel = badges.label.trim().length > 0;
 
-    const inner = (child as any).props?.children;
-    return inner != null && React.Children.count(inner) > 0;
-  });
-})();
+    let badgeNode: ReactNode = null;
 
+    if (enabled) {
+      if (slotHasContent) {
+        badgeNode = slot;
+      } else if (hasConfiguredLabel) {
+        badgeNode = (
+          <BadgeBar
+            badges={[
+              {
+                key: 'makeswift-badge',
+                label: badges.label, // ✅ remove this next line if lint forbids `!` (see note below)
+                variant: badges.variant,
+                href: badges.href,
+              },
+            ]}
+          />
+        );
+      } else {
+        badgeNode = <ProductBadgeBarFromProductClient entityId={ctx.productId} />;
+      }
+    }
 
-const hasConfiguredLabel = Boolean(badges?.label?.trim());
-
-const badgeNode =
-  enabled
-    ? slotHasContent
-      ? badges!.slot
-      : hasConfiguredLabel
-        ? (
-            <BadgeBar
-              badges={[
-                {
-                  key: 'ms-badge-1',
-                  label: badges!.label.trim(),
-                  variant: badges!.variant,
-                  href: badges?.href?.trim() ? badges.href.trim() : undefined,
-                },
-              ]}
-            />
-          )
-        : <ProductBadgeBarFromProductClient entityId={ctx.productId} />
-    : null;
-
-
-
-      return (
-  <div className="flex flex-col gap-3" ref={ref}>
-    <ProductDetailImpl {...{ ...ctx, ...editable, badgeBar: badgeNode }} />
-  </div>
-);
+    return (
+      <div className="flex flex-col gap-3" ref={ref}>
+        <ProductDetailImpl {...{ ...ctx, ...editable, badgeBar: badgeNode }} />
+      </div>
+    );
   },
 );

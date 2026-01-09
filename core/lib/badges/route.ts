@@ -1,6 +1,7 @@
 // app/api/pdp/badges/route.ts
-import { NextResponse } from "next/server";
-import { computeBadges } from "./config";
+import { NextResponse } from 'next/server';
+
+import { computeBadges } from './config';
 
 /**
  * Replace this with your existing Catalyst/Storefront GraphQL fetch helper if you have one.
@@ -21,18 +22,16 @@ async function fetchProductForBadges(entityId: number) {
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const entityIdStr = searchParams.get("entityId");
+  const entityIdStr = searchParams.get('entityId');
 
   if (!entityIdStr) {
-    return NextResponse.json(
-      { error: "Missing required query param: entityId" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: 'Missing required query param: entityId' }, { status: 400 });
   }
 
   const entityId = Number(entityIdStr);
+
   if (!Number.isFinite(entityId)) {
-    return NextResponse.json({ error: "entityId must be a number" }, { status: 400 });
+    return NextResponse.json({ error: 'entityId must be a number' }, { status: 400 });
   }
 
   const product = await fetchProductForBadges(entityId);
