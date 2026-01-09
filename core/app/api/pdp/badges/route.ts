@@ -1,12 +1,9 @@
-// app/api/pdp/badges/route.ts
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-interface Badge {
-  key: string;
-  label: string;
-  variant: 'neutral' | 'info' | 'success' | 'warning' | 'sale';
-  href?: string;
-}
+import { getBadgesForProduct } from '~/lib/badges/config';
+import type { Badge } from '~/lib/badges/types';
+
+
 
 interface ProductResponse {
   brand?: { name?: string | null } | null;
@@ -21,53 +18,77 @@ function isProductResponse(value: unknown): value is ProductResponse {
 
   const brand = value.brand;
 
-  // brand is optional
   if (brand === undefined || brand === null) return true;
-
   if (!isRecord(brand)) return false;
 
   const name = brand.name;
 
-  // name is optional
   return name === undefined || name === null || typeof name === 'string';
 }
 
-export async function GET(request: Request) {
-  const emptyBadges: Badge[] = [];
-
-  const { searchParams } = new URL(request.url);
-
-  const entityIdParam = searchParams.get('entityId');
-
-  if (entityIdParam == null) {
-    return NextResponse.json({ error: 'Missing required query param: entityId' }, { status: 400 });
+function safeJsonParse(text: string): unknown {
+  try {
+    // JSON.parse returns `any`, but we store it as `unknown`
+    const parsed: unknown = JSON.parse(text);
+    return parsed;
+  } catch {
+    return null;
   }
+}
 
-  const entityId = Number(entityIdParam);
+function empty(entityId: number): NextResponse {
+  return NextResponse.json({ entityId, badges: [] satisfies Badge[] }, { status: 200 });
+}
 
-  if (Number.isNaN(entityId)) {
-    return NextResponse.json({ error: 'entityId must be a number' }, { status: 400 });
-  }
+export async function GET(request: NextRequest) {
+  let entityId = 0;
 
-  const res = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL ?? ''}/api/products/${entityId}`, {
-    next: { revalidate: 60 },
-  });
+  try {
+    const { searchParams, origin } = request.nextUrl;
 
-  if (!res.ok) {
-    return NextResponse.json({ badges: emptyBadges });
-  }
+    const entityIdParam = searchParams.get('entityId');
 
-  const json: unknown = await res.json();
+    entityId = Number(entityIdParam);
 
-  if (!isProductResponse(json)) {
-    return NextResponse.json({ badges: emptyBadges });
-  }
+    if (!Number.isFinite(entityId)) {
+      return NextResponse.json({ error: 'entityId must be a number' }, { status: 400 });
+    }
 
-  const brandName = json.brand?.name?.trim().toLowerCase() ?? '';
+    // Preserve locale + auth context when Makeswift iframe loads
+    const cookie = request.headers.get('cookie') ?? '';
+    const acceptLanguage = request.headers.get('accept-language') ?? '';
+    const locale = searchParams.get('locale');
 
-  const badges: Badge[] = brandName.includes('planted')
-    ? [{ key: 'planted-sale', label: 'SALE', variant: 'sale', href: '/sale' }]
-    : [];
+   // IMPORTANT: force canonical trailing slash to match `trailingSlash: true`
+      const productUrl = new URL(`${origin}/api/products/${entityId}/`);
 
-  return NextResponse.json({ badges });
+      if (locale != null && locale.trim().length > 0) {
+      productUrl.searchParams.set('locale', locale);
+    } 
+
+    const productRes = await fetch(productUrl.toString(), {
+      headers: {
+        cookie,
+        'accept-language': acceptLanguage,
+      },
+      cache: 'no-store',
+    });
+
+    if (!productRes.ok) return empty(entityId);
+
+    const text = await productRes.text();
+    const json = safeJsonParse(text);
+
+    if (!isProductResponse(json)) return empty(entityId);
+
+    const brandName = (json.brand?.name ?? '').trim().toLowerCase();
+    const badges = getBadgesForProduct({ brandName });
+
+    return NextResponse.json({ entityId, badges }, { status: 200 });
+ } catch (err: unknown) {
+  // Never throw from this endpoint — Makeswift iframe should stay resilient.
+  console.error('Badges endpoint failed', { entityId }, err);
+
+  return empty(entityId);
+}
 }

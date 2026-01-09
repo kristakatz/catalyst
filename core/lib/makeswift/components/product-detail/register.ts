@@ -38,36 +38,38 @@ const badges = Group({
       defaultValue: true,
     }),
 
-    // Placement can stay for now, but note: since we now inject under the title via `badgeBar`,
-    // placement only matters if you want to support other positions later.
+    // Optional: keep if you might support other placements later
     placement: Select({
       label: 'Placement',
-      options: [
-        { label: 'Under title', value: 'UnderTitle' }, // friendlier
-      ],
+      options: [{ label: 'Under title', value: 'UnderTitle' }],
       defaultValue: 'UnderTitle',
     }),
 
-    label: TextInput({
-      label: 'Badge text',
-      defaultValue: 'SALE',
-    }),
-
-    variant: Select({
-      label: 'Style',
-      options: [
-        { label: 'Sale (cerulean)', value: 'sale' },
-        { label: 'Neutral', value: 'neutral' },
-        { label: 'Info', value: 'info' },
-        { label: 'Success', value: 'success' },
-        { label: 'Warning', value: 'warning' },
-      ],
-      defaultValue: 'sale',
-    }),
-
-    href: TextInput({
-      label: 'Link (optional)',
-      defaultValue: '/sale',
+    // ✅ Editors manage a list of badges
+    items: List({
+      label: 'Badges',
+      type: Group({
+        label: 'Badge',
+        props: {
+          label: TextInput({ label: 'Badge text', defaultValue: 'SALE' }),
+          variant: Select({
+            label: 'Style',
+            options: [
+              { label: 'Sale (cerulean)', value: 'sale' },
+              { label: 'Neutral', value: 'neutral' },
+              { label: 'Info', value: 'info' },
+              { label: 'Success', value: 'success' },
+              { label: 'Warning', value: 'warning' },
+            ],
+            defaultValue: 'sale',
+          }),
+          href: TextInput({
+            label: 'Link (optional)',
+            defaultValue: '/sale',
+          }),
+        },
+      }),
+      getItemLabel: (b) => b?.label || 'Badge',
     }),
 
     // Optional: allow editors to fully override with custom content if they want

@@ -8,7 +8,6 @@ import React, {
   isValidElement,
   type PropsWithChildren,
   type ReactNode,
-  type Ref,
   useCallback,
   useContext,
 } from 'react';
@@ -45,6 +44,7 @@ export const DescriptionSource = {
 
 type DescriptionSource = (typeof DescriptionSource)[keyof typeof DescriptionSource];
 
+type BadgeVariant = 'sale' | 'neutral' | 'info' | 'success' | 'warning';
 type BadgePlacement = 'UnderTitle';
 
 interface EditableProps {
@@ -55,23 +55,40 @@ interface EditableProps {
   badges: {
     enabled: boolean;
     placement: BadgePlacement;
+    items: Array<{
+      label: string;
+      variant: BadgeVariant;
+      href: string;
+    }>;
     slot: ReactNode;
-    label: string;
-    variant: 'sale' | 'neutral' | 'info' | 'success' | 'warning';
-    href: string;
   };
 }
 
 type EditablePropsWithoutBadges = Omit<EditableProps, 'badges'>;
 
-const ProductDetailImpl = ({
+function hasRenderableSlotContent(node: ReactNode | undefined): boolean {
+  if (node == null) return false;
+
+  return Children.toArray(node).some((child) => {
+    if (typeof child === 'string') return child.trim().length > 0;
+    if (typeof child === 'number') return true;
+
+    if (isValidElement<{ children?: ReactNode }>(child)) {
+      return hasRenderableSlotContent(child.props.children);
+    }
+
+    return false;
+  });
+}
+
+function ProductDetailImpl({
   summaryText,
   description,
   accordions,
   product: streamableProduct,
   badgeBar,
   ...props
-}: Props & EditablePropsWithoutBadges & { badgeBar?: ReactNode }) => {
+}: Props & EditablePropsWithoutBadges & { badgeBar?: ReactNode }) {
   const getProductDescription = useCallback(
     (product: ProductDetail): ProductDetail['description'] => {
       switch (description.source) {
@@ -91,13 +108,14 @@ const ProductDetailImpl = ({
   const getProductAccordions = useCallback(
     (
       productAccordions: Awaited<ProductDetail['accordions']>,
-    ): Awaited<ProductDetail['accordions']> =>
-      productAccordions != null
-        ? mergeSections(productAccordions, accordions, (left, right) => ({
-            ...left,
-            content: right.content,
-          }))
-        : undefined,
+    ): Awaited<ProductDetail['accordions']> => {
+      if (productAccordions === undefined) return undefined;
+
+      return mergeSections(productAccordions, accordions, (left, right) => ({
+        ...left,
+        content: right.content,
+      }));
+    },
     [accordions],
   );
 
@@ -109,7 +127,7 @@ const ProductDetailImpl = ({
             <ProductDetail
               {...{
                 ...props,
-                badgeBar, // ✅ add this
+                badgeBar,
                 product: {
                   ...product,
                   summary: summaryText,
@@ -123,23 +141,10 @@ const ProductDetailImpl = ({
       )}
     </Stream>
   );
-};
-
-function hasRenderableSlotContent(node: ReactNode): boolean {
-  if (node == null) return false;
-
-  return Children.toArray(node).some((child) => {
-    if (typeof child === 'string') return child.trim().length > 0;
-
-    // numbers / elements / fragments count as content
-    if (typeof child === 'number') return true;
-
-    return isValidElement(child);
-  });
 }
 
-export const MakeswiftProductDetail = forwardRef(
-  (props: EditableProps, ref: Ref<HTMLDivElement>) => {
+export const MakeswiftProductDetail = forwardRef<HTMLDivElement, EditableProps>(
+  function MakeswiftProductDetail(props, ref) {
     const passedProps = useContext(PropsContext);
 
     if (passedProps == null) {
@@ -159,27 +164,24 @@ export const MakeswiftProductDetail = forwardRef(
     const slot = badges.slot;
     const slotHasContent = hasRenderableSlotContent(slot);
 
-    // If Makeswift configured a badge via fields (label/variant/href), render that via BadgeBar
-    const hasConfiguredLabel = badges.label.trim().length > 0;
+    const configuredItems = badges.items;
+
+    const normalizedBadges = configuredItems
+      .filter((b) => b.label.trim().length > 0)
+      .map((b, index) => ({
+        key: `makeswift-${index}-${b.label}`,
+        label: b.label,
+        variant: b.variant,
+        href: b.href.trim().length > 0 ? b.href : undefined,
+      }));
 
     let badgeNode: ReactNode = null;
 
     if (enabled) {
       if (slotHasContent) {
         badgeNode = slot;
-      } else if (hasConfiguredLabel) {
-        badgeNode = (
-          <BadgeBar
-            badges={[
-              {
-                key: 'makeswift-badge',
-                label: badges.label, // ✅ remove this next line if lint forbids `!` (see note below)
-                variant: badges.variant,
-                href: badges.href,
-              },
-            ]}
-          />
-        );
+      } else if (normalizedBadges.length > 0) {
+        badgeNode = <BadgeBar badges={normalizedBadges} />;
       } else {
         badgeNode = <ProductBadgeBarFromProductClient entityId={ctx.productId} />;
       }

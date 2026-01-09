@@ -1,11 +1,6 @@
 import { Link } from '~/components/link';
+import type { Badge } from '~/lib/badges/types';
 
-export interface Badge {
-  key: string;
-  label: string;
-  variant: 'neutral' | 'info' | 'success' | 'warning' | 'sale';
-  href?: string;
-}
 
 function badgeClasses(variant: Badge['variant']) {
   switch (variant) {

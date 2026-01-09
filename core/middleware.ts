@@ -31,4 +31,6 @@ export const config = {
      */
     '/((?!api|admin|_next/static|_next/image|_vercel|favicon.ico|xmlsitemap.php|sitemap.xml|robots.txt).*)',
   ],
+  
 };
+
